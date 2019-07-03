@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Threading;
 using System.Windows.Forms;
 
@@ -9,16 +10,16 @@ namespace DownloadManager
 {
     public partial class DownloadForm : Form
     {
-        WebClient client;
         public string Url { get; set; }
         public string FileName { get; set; }
         public string FileFormat { get; set; }
-        public double FileSize { get; set; }
+        public int FileSize { get; set; }
         public string Path { get; set; }
-        public double Percentage { get; set; }
+        public double percentage { get; set; }
         private string[] inputFilePaths;
         private MainForm mainForm;
-
+        int location = 0;
+        static int s = 0;
         public DownloadForm(MainForm form)
         {
             InitializeComponent();
@@ -32,12 +33,11 @@ namespace DownloadManager
                 try
                 {
                     Url = txtAddress.Text;
-                    //Uri uri = new Uri(this.Url);
-                    FileName = txtFileName.Text;//System.IO.Path.GetFileName(uri.AbsolutePath);
+                    FileName = txtFileName.Text;
                     FileFormat = txtFileFormat.Text;
+                    Path = txtPath.Text + '/' + FileName + '.' + FileFormat;
                     int count = int.Parse(txtThreadCount.Text);
                     inputFilePaths = new string[count];
-                    //client.DownloadFileAsync(uri, txtPath.Text + "/" + FileName);
 
                     var webRequest = HttpWebRequest.Create(Url);
                     webRequest.Method = "HEAD";
@@ -46,19 +46,19 @@ namespace DownloadManager
                     using (var webResponse = webRequest.GetResponse())
                     {
                         var fileSize = webResponse.Headers.Get("Content-Length");
-                        fileSizeInByte = Convert.ToInt32(fileSize);
+                        FileSize = fileSizeInByte = Convert.ToInt32(fileSize);
                     }
                     
                     int packetSize = fileSizeInByte / (count - 1);
                     for (int i = 0; count > 0; i += packetSize)
                     {
-                        Abc abc = new Abc(i, i + packetSize, 
-                            (inputFilePaths.Length - count).ToString(), FileName, FileFormat);
+                        inputFilePaths[inputFilePaths.Length - count] = FileName + (inputFilePaths.Length - count);
+                        Abc abc = new Abc(i, i + packetSize - 1, FileName + (inputFilePaths.Length - count));
                         if (count == 1)
                         {
                             abc.To = fileSizeInByte;
                         }
-
+                        
                         WaitCallback workItem = new WaitCallback(GetFileFromServer);
                         ThreadPool.QueueUserWorkItem(workItem, abc);
                         count--;
@@ -84,20 +84,43 @@ namespace DownloadManager
         private void GetFileFromServer(object state)
         {
             Abc abc = state as Abc;
-            string path = abc.FileName + abc.Part + "." + abc.FileFormat;
+            
             var request = (HttpWebRequest)WebRequest.Create(Url);
             request.AddRange(abc.From, abc.To);
             using (var response = request.GetResponse())
             using (var stream = response.GetResponseStream())
-            using (var output = File.Create(path))
+            using (var output = File.Create(abc.Path))
             {
                 stream.CopyTo(output);
+                progressBar.Minimum = 0;
+                double receive = (double)output.Length;
+                percentage = receive / FileSize * 100;
+                Interlocked.Add(ref location, (int)percentage);
+                Invoke(new Action(() =>
+                {
+                    lblStatus.Text = $"Downloaded {string.Format("{0:0.##}", location)}";
+                    progressBar.Value = int.Parse(Math.Truncate((double)location).ToString());
+                    progressBar.Update();
+                    s++;
+                }));
             }
+            if (s == inputFilePaths.Length)
+            {
+                Invoke(new Action(() =>
+                {
+                    CombineMultipleFilesIntoSingleFile();
+                    lblStatus.Text = $"Downloaded {string.Format("{0:0.##}", 100)}";
+                    progressBar.Value = 100;
+                    progressBar.Update();
+                }));
+            }
+                
         }
 
         private void btnStop_Click(object sender, EventArgs e)
         {
-            client.CancelAsync();
+            //client.CancelAsync();
+            CombineMultipleFilesIntoSingleFile();
         }
 
         private void btnBrowse_Click(object sender, EventArgs e)
@@ -113,10 +136,7 @@ namespace DownloadManager
         
         private void DownloadForm_Load(object sender, EventArgs e)
         {
-            client = new WebClient();
-            client.DownloadProgressChanged += Client_DownloadProgressChanged;
-            client.DownloadFileCompleted += Client_DownloadFileCompleted;
-            txtPath.Text = Environment.SpecialFolder.Desktop.ToString();
+            txtPath.Text = System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
         }
 
         private void Client_DownloadFileCompleted(object sender, AsyncCompletedEventArgs e)
@@ -138,20 +158,9 @@ namespace DownloadManager
             this.Close();
         }
 
-        private void Client_DownloadProgressChanged(object sender, DownloadProgressChangedEventArgs e)
+        private void CombineMultipleFilesIntoSingleFile()
         {
-            progressBar.Minimum = 0;
-            double receive = double.Parse(e.BytesReceived.ToString());
-            FileSize = double.Parse(e.TotalBytesToReceive.ToString());
-            Percentage = receive / FileSize * 100;
-            lblStatus.Text = $"Downloaded {string.Format("{0:0.##}", Percentage)}";
-            progressBar.Value = int.Parse(Math.Truncate(Percentage).ToString());
-            progressBar.Update();
-        }
-
-        private static void CombineMultipleFilesIntoSingleFile()
-        {
-            using (var outputStream = File.Create(outputFilePath))
+            using (var outputStream = File.Create(Path))
             {
                 foreach (var inputFilePath in inputFilePaths)
                 {
