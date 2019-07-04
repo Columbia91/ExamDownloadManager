@@ -35,7 +35,7 @@
             this.progressBar = new System.Windows.Forms.ProgressBar();
             this.lblStatus = new System.Windows.Forms.Label();
             this.btnStart = new System.Windows.Forms.Button();
-            this.btnStop = new System.Windows.Forms.Button();
+            this.btnExit = new System.Windows.Forms.Button();
             this.btnBrowse = new System.Windows.Forms.Button();
             this.label3 = new System.Windows.Forms.Label();
             this.txtFileName = new System.Windows.Forms.TextBox();
@@ -103,15 +103,15 @@
             this.btnStart.UseVisualStyleBackColor = true;
             this.btnStart.Click += new System.EventHandler(this.btnStart_Click);
             // 
-            // btnStop
+            // btnExit
             // 
-            this.btnStop.Location = new System.Drawing.Point(506, 208);
-            this.btnStop.Name = "btnStop";
-            this.btnStop.Size = new System.Drawing.Size(75, 23);
-            this.btnStop.TabIndex = 7;
-            this.btnStop.Text = "Stop";
-            this.btnStop.UseVisualStyleBackColor = true;
-            this.btnStop.Click += new System.EventHandler(this.btnStop_Click);
+            this.btnExit.Location = new System.Drawing.Point(506, 208);
+            this.btnExit.Name = "btnExit";
+            this.btnExit.Size = new System.Drawing.Size(75, 23);
+            this.btnExit.TabIndex = 7;
+            this.btnExit.Text = "Exit";
+            this.btnExit.UseVisualStyleBackColor = true;
+            this.btnExit.Click += new System.EventHandler(this.btnExit_Click);
             // 
             // btnBrowse
             // 
@@ -183,7 +183,7 @@
             this.Controls.Add(this.txtFileName);
             this.Controls.Add(this.label3);
             this.Controls.Add(this.btnBrowse);
-            this.Controls.Add(this.btnStop);
+            this.Controls.Add(this.btnExit);
             this.Controls.Add(this.btnStart);
             this.Controls.Add(this.lblStatus);
             this.Controls.Add(this.progressBar);
@@ -210,7 +210,7 @@
         private System.Windows.Forms.ProgressBar progressBar;
         private System.Windows.Forms.Label lblStatus;
         private System.Windows.Forms.Button btnStart;
-        private System.Windows.Forms.Button btnStop;
+        private System.Windows.Forms.Button btnExit;
         private System.Windows.Forms.Button btnBrowse;
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.TextBox txtFileName;

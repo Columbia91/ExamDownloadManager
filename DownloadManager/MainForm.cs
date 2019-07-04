@@ -47,8 +47,15 @@ namespace DownloadManager
                 item.SubItems.Add(row.FileName);
                 item.SubItems.Add(row.FileSize);
                 item.SubItems.Add(row.DateTime.ToLongDateString());
+                item.SubItems.Add(row.Format);
+                item.SubItems.Add(row.Path);
                 listView1.Items.Add(item);
             }
+        }
+
+        private void ListView1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+
         }
     }
 }

@@ -12,10 +12,9 @@ namespace DownloadManager
     {
         public string Url { get; set; }
         public string FileName { get; set; }
-        public string FileFormat { get; set; }
-        public int FileSize { get; set; }
+        public double FileSize { get; set; }
         public string Path { get; set; }
-        public double percentage { get; set; }
+        public double Percentage { get; set; }
         private string[] inputFilePaths;
         private MainForm mainForm;
         int location = 0;
@@ -28,14 +27,16 @@ namespace DownloadManager
 
         private void btnStart_Click(object sender, EventArgs e)
         {
-            if (!string.IsNullOrEmpty(txtAddress.Text) && !string.IsNullOrWhiteSpace(txtAddress.Text))
+            if (!string.IsNullOrEmpty(txtAddress.Text) && !string.IsNullOrWhiteSpace(txtAddress.Text)
+                && !string.IsNullOrEmpty(txtThreadCount.Text) && !string.IsNullOrWhiteSpace(txtThreadCount.Text)
+                && !string.IsNullOrEmpty(txtFileName.Text) && !string.IsNullOrWhiteSpace(txtFileName.Text)
+                && !string.IsNullOrEmpty(txtFileFormat.Text) && !string.IsNullOrWhiteSpace(txtFileFormat.Text))
             {
                 try
                 {
                     Url = txtAddress.Text;
                     FileName = txtFileName.Text;
-                    FileFormat = txtFileFormat.Text;
-                    Path = txtPath.Text + '/' + FileName + '.' + FileFormat;
+                    Path = txtPath.Text + '/' + FileName + '.' + txtFileFormat.Text;
                     int count = int.Parse(txtThreadCount.Text);
                     inputFilePaths = new string[count];
 
@@ -78,49 +79,43 @@ namespace DownloadManager
                 }
             }
             else
-                MessageBox.Show("Укажите Url файла", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Укажите необходимые данные", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
         private void GetFileFromServer(object state)
         {
-            Abc abc = state as Abc;
-            
-            var request = (HttpWebRequest)WebRequest.Create(Url);
-            request.AddRange(abc.From, abc.To);
-            using (var response = request.GetResponse())
-            using (var stream = response.GetResponseStream())
-            using (var output = File.Create(abc.Path))
+            try
             {
-                stream.CopyTo(output);
-                progressBar.Minimum = 0;
-                double receive = (double)output.Length;
-                percentage = receive / FileSize * 100;
-                Interlocked.Add(ref location, (int)percentage);
-                Invoke(new Action(() =>
+                Abc abc = state as Abc;
+
+                var request = (HttpWebRequest)WebRequest.Create(Url);
+                request.AddRange(abc.From, abc.To);
+                using (var response = request.GetResponse())
+                using (var stream = response.GetResponseStream())
+                using (var output = File.Create(abc.Path))
                 {
-                    lblStatus.Text = $"Downloaded {string.Format("{0:0.##}", location)}";
-                    progressBar.Value = int.Parse(Math.Truncate((double)location).ToString());
-                    progressBar.Update();
-                    s++;
-                }));
-            }
-            if (s == inputFilePaths.Length)
-            {
-                Invoke(new Action(() =>
+                    stream.CopyTo(output);
+                    progressBar.Minimum = 0;
+                    double receive = (double)output.Length;
+                    Percentage = receive / FileSize * 100;
+                    Interlocked.Add(ref location, (int)Percentage);
+                    Invoke(new Action(() =>
+                    {
+                        lblStatus.Text = $"Downloaded {string.Format("{0}%", location)}";
+                        progressBar.Value = int.Parse(Math.Truncate((double)location).ToString());
+                        progressBar.Update();
+                        s++;
+                    }));
+                }
+                if (s == inputFilePaths.Length)
                 {
                     CombineMultipleFilesIntoSingleFile();
-                    lblStatus.Text = $"Downloaded {string.Format("{0:0.##}", 100)}";
-                    progressBar.Value = 100;
-                    progressBar.Update();
-                }));
+                }
             }
-                
-        }
-
-        private void btnStop_Click(object sender, EventArgs e)
-        {
-            //client.CancelAsync();
-            CombineMultipleFilesIntoSingleFile();
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            } 
         }
 
         private void btnBrowse_Click(object sender, EventArgs e)
@@ -139,13 +134,31 @@ namespace DownloadManager
             txtPath.Text = System.Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
         }
 
-        private void Client_DownloadFileCompleted(object sender, AsyncCompletedEventArgs e)
+        private void CombineMultipleFilesIntoSingleFile()
         {
+            try
+            {
+                using (var outputStream = File.Create(Path))
+                {
+                    foreach (var inputFilePath in inputFilePaths)
+                    {
+                        using (var inputStream = File.OpenRead(inputFilePath))
+                        {
+                            // Buffer size can be passed as the second argument.
+                            inputStream.CopyTo(outputStream);
+                        }
+                    }
+                }
+            }
+            catch {}
+            
             Database.FilesRow row = App.DB.Files.NewFilesRow();
             row.Url = Url;
             row.FileName = FileName;
-            row.FileSize = (string.Format("{0:0.##}", FileSize / 1024));
+            row.FileSize = (string.Format("{0:0.##} MB", (FileSize / 1024 / 1024)));
             row.DateTime = DateTime.Now;
+            row.Path = Path;
+            row.Format = txtFileFormat.Text;
             App.DB.Files.AddFilesRow(row);
             App.DB.AcceptChanges();
             App.DB.WriteXml(string.Format("{0}/data.dat", Application.StartupPath));
@@ -154,23 +167,21 @@ namespace DownloadManager
             item.SubItems.Add(row.FileName);
             item.SubItems.Add(row.FileSize);
             item.SubItems.Add(row.DateTime.ToLongDateString());
-            mainForm.listView1.Items.Add(item);
-            this.Close();
+            item.SubItems.Add(row.Format);
+            item.SubItems.Add(row.Path);
+            
+            Invoke(new Action(() =>
+            {
+                lblStatus.Text = $"Downloaded {string.Format("{0}%", 100)}";
+                progressBar.Value = 100;
+                progressBar.Update();
+                mainForm.listView1.Items.Add(item);
+            }));
         }
 
-        private void CombineMultipleFilesIntoSingleFile()
+        private void btnExit_Click(object sender, EventArgs e)
         {
-            using (var outputStream = File.Create(Path))
-            {
-                foreach (var inputFilePath in inputFilePaths)
-                {
-                    using (var inputStream = File.OpenRead(inputFilePath))
-                    {
-                        // Buffer size can be passed as the second argument.
-                        inputStream.CopyTo(outputStream);
-                    }
-                }
-            }
+            this.Close();
         }
     }
 }
